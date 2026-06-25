@@ -8,9 +8,9 @@
 
 ## Screenshots
 
-| Setup | Live interview |
-|---|---|
-| ![Setup screen](image.png) | ![Interview in progress](interview.png) |
+| Setup | Live interview | Scorecard |
+|---|---|---|
+| ![Setup screen](image.png) | ![Interview in progress](interview.png) | ![Scorecard](scorecard.png) |
 
 ---
 
