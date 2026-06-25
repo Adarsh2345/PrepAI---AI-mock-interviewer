@@ -6,6 +6,14 @@ A real-time voice-based behavioral interview coach. Ask a question out loud, get
 
 ---
 
+## Screenshots
+
+| Setup | Interview |
+|---|---|
+| ![Setup screen](image.png) | ![Interview in progress](interview.png) |
+
+---
+
 ## What it does
 
 PrepAI runs a full 10-question behavioral interview over voice, entirely locally (no cloud STT/TTS required):
