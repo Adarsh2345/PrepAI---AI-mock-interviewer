@@ -1,0 +1,18 @@
+# Core — install this to run PrepAI with default providers (faster-whisper + Piper + Gemini)
+sounddevice>=0.4.6
+numpy>=1.24.0
+python-dotenv>=1.0.0
+aiohttp>=3.9.0
+
+# VAD — Silero (pulls PyTorch; use the CPU wheel to avoid the CUDA build)
+# pip install torch --index-url https://download.pytorch.org/whl/cpu
+silero-vad>=5.1.0
+
+# STT — faster-whisper (local, default)
+faster-whisper>=1.0.0
+
+# LLM — Gemini
+google-genai>=1.0.0
+
+# TTS — Piper (local, default)
+piper-tts>=1.2.0

@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrepAI — AI Mock Interviewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #09090b;
+  --surface:     #111113;
+  --surface2:    #18181b;
+  --surface3:    #1f1f23;
+  --border:      #27272a;
+  --border2:     #3f3f46;
+  --text:        #fafafa;
+  --text2:       #a1a1aa;
+  --text3:       #52525b;
+  --accent:      #6366f1;
+  --accent-dim:  rgba(99,102,241,0.1);
+  --accent-glow: rgba(99,102,241,0.25);
+  --green:       #22c55e;
+  --green-dim:   rgba(34,197,94,0.1);
+  --yellow:      #eab308;
+  --yellow-dim:  rgba(234,179,8,0.1);
+  --red:         #ef4444;
+  --red-dim:     rgba(239,68,68,0.1);
+  --radius:      8px;
+  --radius-lg:   12px;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─────────────────────────────────────────────────────
+   SETUP SCREEN
+───────────────────────────────────────────────────── */
+#setup-screen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: var(--bg);
+}
+
+.setup-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 36px 40px;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.setup-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setup-header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.setup-header p {
+  font-size: 13px;
+  color: var(--text2);
+}
+
+hr.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  letter-spacing: 0;
+}
+
+input[type="text"], textarea, select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 9px 12px;
+  width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+  resize: none;
+}
+
+input[type="text"]::placeholder,
+textarea::placeholder { color: var(--text3); }
+
+input[type="text"]:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+textarea { min-height: 110px; line-height: 1.5; }
+select option { background: var(--surface2); }
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.start-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: white;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 11px 20px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  letter-spacing: -0.01em;
+}
+.start-btn:hover { opacity: 0.88; }
+.start-btn:active { opacity: 0.75; }
+
+/* ─────────────────────────────────────────────────────
+   INTERVIEW SCREEN
+───────────────────────────────────────────────────── */
+#interview-screen {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* Top bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.topbar-brand {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.topbar-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border2);
+  flex-shrink: 0;
+}
+
+.topbar-context {
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 400;
+}
+.topbar-context strong { color: var(--text); font-weight: 500; }
+
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text2);
+}
+#progress-label { font-variant-numeric: tabular-nums; }
+.progress-track {
+  width: 72px;
+  height: 3px;
+  background: var(--surface3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+#progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.4s ease;
+}
+
+#conn-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text2);
+}
+#conn-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text3);
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+#conn-dot.connected { background: var(--green); }
+
+/* Main layout */
+.interview-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  height: calc(100vh - 52px);
+  overflow: hidden;
+}
+
+/* Left column */
+.left-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  gap: 32px;
+  padding: 48px 40px;
+}
+
+/* Avatar */
+.avatar-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+/* Initials inside avatar */
+.avatar-initials {
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--text2);
+  letter-spacing: -0.02em;
+  user-select: none;
+  transition: color 0.3s;
+}
+
+/* State rings */
+.avatar-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  pointer-events: none;
+}
+
+.avatar.listening .avatar-ring {
+  border-color: var(--green);
+  box-shadow: 0 0 0 4px var(--green-dim), 0 0 24px rgba(34,197,94,0.2);
+}
+.avatar.listening .avatar-initials { color: var(--text); }
+
+.avatar.agent-speaking .avatar-ring {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-dim), 0 0 32px var(--accent-glow);
+  animation: ring-pulse 2s ease-in-out infinite;
+}
+.avatar.agent-speaking .avatar-initials { color: var(--text); }
+
+.avatar.interrupted .avatar-ring {
+  border-color: var(--yellow);
+  box-shadow: 0 0 0 4px var(--yellow-dim);
+}
+
+@keyframes ring-pulse {
+  0%,100% { box-shadow: 0 0 0 4px rgba(99,102,241,0.1), 0 0 20px rgba(99,102,241,0.15); }
+  50%      { box-shadow: 0 0 0 10px rgba(99,102,241,0.15), 0 0 40px rgba(99,102,241,0.3); }
+}
+
+/* Audio bars — visible only while speaking */
+.audio-bars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 28px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  position: absolute;
+}
+.avatar.agent-speaking .audio-bars { opacity: 1; }
+.avatar.agent-speaking .avatar-initials { opacity: 0; }
+
+.bar {
+  width: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  animation: none;
+}
+.avatar.agent-speaking .bar { animation: bar-bounce var(--dur) ease-in-out infinite alternate; }
+.bar:nth-child(1) { --dur: 0.7s; height: 8px;  animation-delay: 0s;    }
+.bar:nth-child(2) { --dur: 0.5s; height: 16px; animation-delay: 0.1s;  }
+.bar:nth-child(3) { --dur: 0.6s; height: 24px; animation-delay: 0.05s; }
+.bar:nth-child(4) { --dur: 0.4s; height: 18px; animation-delay: 0.15s; }
+.bar:nth-child(5) { --dur: 0.7s; height: 10px; animation-delay: 0.08s; }
+
+@keyframes bar-bounce {
+  from { transform: scaleY(0.3); }
+  to   { transform: scaleY(1); }
+}
+
+/* Agent info below avatar */
+.agent-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.agent-name {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.agent-role {
+  font-size: 13px;
+  color: var(--text2);
+}
+
+/* Status pill */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  transition: all 0.25s;
+  margin-top: 4px;
+}
+.status-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--text3);
+  flex-shrink: 0;
+  transition: background 0.25s;
+}
+.status-pill.listening {
+  background: var(--green-dim);
+  border-color: rgba(34,197,94,0.25);
+  color: var(--green);
+}
+.status-pill.listening .status-dot { background: var(--green); }
+.status-pill.agent-speaking {
+  background: var(--accent-dim);
+  border-color: rgba(99,102,241,0.25);
+  color: var(--accent);
+}
+.status-pill.agent-speaking .status-dot {
+  background: var(--accent);
+  animation: dot-blink 1s ease infinite;
+}
+.status-pill.interrupted {
+  background: var(--yellow-dim);
+  border-color: rgba(234,179,8,0.25);
+  color: var(--yellow);
+}
+.status-pill.interrupted .status-dot { background: var(--yellow); }
+
+@keyframes dot-blink {
+  0%,100% { opacity: 1; } 50% { opacity: 0.25; }
+}
+
+/* Mic button */
+.mic-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text2);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 18px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.mic-btn:hover { background: var(--surface3); border-color: var(--text3); color: var(--text); }
+.mic-btn.active { background: var(--green-dim); border-color: rgba(34,197,94,0.35); color: var(--green); }
+
+/* Right column */
+.right-col {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+}
+.right-col::-webkit-scrollbar { width: 3px; }
+.right-col::-webkit-scrollbar-track { background: transparent; }
+.right-col::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.panel-section {
+  border-bottom: 1px solid var(--border);
+  padding: 20px;
+}
+.panel-section:last-child { border-bottom: none; }
+
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text3);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+/* Overall score */
+.overall-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0 4px;
+}
+.overall-num {
+  font-size: 52px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--text3);
+  transition: color 0.4s;
+}
+.overall-num.scored { color: var(--text); }
+.overall-denom { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.verdict-badge {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 20px;
+  display: none;
+}
+.verdict-badge.show { display: inline-block; }
+.verdict-strong { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(34,197,94,0.25); }
+.verdict-good   { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(99,102,241,0.25); }
+.verdict-needs  { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(234,179,8,0.25); }
+.verdict-weak   { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(239,68,68,0.25); }
+
+/* Scorecard dimensions */
+.score-dims { display: flex; flex-direction: column; gap: 14px; }
+.score-dim { display: flex; flex-direction: column; gap: 6px; }
+.score-dim-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.score-dim-label { font-size: 13px; color: var(--text2); font-weight: 400; }
+.score-dim-val {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text3);
+  transition: color 0.3s;
+}
+.score-dim-val.scored { color: var(--text); }
+.score-track {
+  height: 3px;
+  background: var(--surface3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.score-fill {
+  height: 100%;
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* Question tracker */
+.q-tracker { display: flex; flex-direction: column; gap: 2px; }
+.q-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  transition: background 0.15s;
+}
+.q-row.active { background: var(--accent-dim); border-color: rgba(99,102,241,0.2); }
+.q-row.done   { background: transparent; }
+
+.q-num {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--surface3);
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text3);
+  transition: background 0.15s, color 0.15s;
+}
+.q-row.active .q-num { background: var(--accent); color: white; }
+.q-row.done   .q-num { background: var(--surface3); color: var(--green); }
+
+.q-text {
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.4;
+  flex: 1;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.q-row.active .q-text { color: var(--text2); }
+.q-row.done   .q-text { color: var(--text3); }
+
+.q-score {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.q-score.score-great { color: var(--green); }
+.q-score.score-good  { color: var(--accent); }
+.q-score.score-ok    { color: var(--yellow); }
+.q-score.score-weak  { color: var(--red); }
+
+/* Final verdict */
+#summary-panel { display: none; }
+.summary-text {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.7;
+  padding: 14px 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════
+     SETUP SCREEN
+═══════════════════════════════════════════════════ -->
+<div id="setup-screen">
+  <div class="setup-card">
+
+    <div class="setup-header">
+      <h1>PrepAI</h1>
+      <p>AI-powered mock interview with real-time voice feedback</p>
+    </div>
+
+    <hr class="divider">
+
+    <div class="field-row">
+      <div class="field-group">
+        <label>Your name</label>
+        <input type="text" id="candidate-name" placeholder="e.g. Adarsh" />
+      </div>
+      <div class="field-group">
+        <label>Target role</label>
+        <input type="text" id="target-role" placeholder="e.g. Software Engineer" />
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label>Job description <span style="color:var(--text3);font-weight:400">(optional — tailors the questions)</span></label>
+      <textarea id="jd-input" placeholder="Paste the job description here. Leave blank for a general behavioral interview."></textarea>
+    </div>
+
+    <div class="field-row">
+      <div class="field-group">
+        <label>Questions</label>
+        <select id="q-count">
+          <option value="5">5 questions (~10 min)</option>
+          <option value="10" selected>10 questions (~20 min)</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>Difficulty</label>
+        <select id="difficulty">
+          <option value="standard" selected>Standard</option>
+          <option value="senior">Senior / Tough</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="start-btn" onclick="startInterview()">Start Interview</button>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     INTERVIEW SCREEN
+═══════════════════════════════════════════════════ -->
+<div id="interview-screen">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-brand">PrepAI</div>
+    <div class="topbar-sep"></div>
+    <div class="topbar-context">
+      Interviewing <strong id="tb-name">—</strong> for <strong id="tb-role">—</strong>
+    </div>
+    <div class="topbar-right">
+      <div class="progress-wrap">
+        <span id="progress-label">Q 0 / 0</span>
+        <div class="progress-track"><div id="progress-bar"></div></div>
+      </div>
+      <div id="conn-badge">
+        <div id="conn-dot"></div>
+        <span id="conn-label">Connecting…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="interview-body">
+
+    <!-- Left: agent -->
+    <div class="left-col">
+
+      <div class="avatar-wrap">
+        <div class="avatar idle" id="orb" onclick="toggleMic()">
+          <div class="avatar-ring"></div>
+          <span class="avatar-initials">A</span>
+          <div class="audio-bars">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="agent-info">
+        <div class="agent-name">Alex</div>
+        <div class="agent-role">Senior Interviewer · Behavioral</div>
+        <div class="status-pill" id="state-label">
+          <span class="status-dot"></span>
+          <span id="state-text">Idle</span>
+        </div>
+      </div>
+
+      <button class="mic-btn" id="mic-btn" onclick="toggleMic()">
+        <span id="mic-btn-label">Click to start</span>
+      </button>
+
+    </div>
+
+    <!-- Right: scorecard -->
+    <div class="right-col">
+
+      <!-- Overall score — hidden until summary -->
+      <div class="panel-section" id="overall-panel" style="display:none">
+        <div class="section-label">Overall Score</div>
+        <div class="overall-score">
+          <div class="overall-num" id="overall-num">—</div>
+          <div class="overall-denom">out of 10</div>
+          <div class="verdict-badge" id="overall-verdict"></div>
+        </div>
+      </div>
+
+      <!-- Dimension scores — hidden until summary -->
+      <div class="panel-section" id="scorecard-panel" style="display:none">
+        <div class="section-label">Scorecard</div>
+        <div class="score-dims">
+          <div class="score-dim">
+            <div class="score-dim-row">
+              <span class="score-dim-label">Communication</span>
+              <span class="score-dim-val" id="dim-communication">—</span>
+            </div>
+            <div class="score-track"><div class="score-fill" id="fill-communication" style="background:var(--accent)"></div></div>
+          </div>
+          <div class="score-dim">
+            <div class="score-dim-row">
+              <span class="score-dim-label">Structure</span>
+              <span class="score-dim-val" id="dim-structure">—</span>
+            </div>
+            <div class="score-track"><div class="score-fill" id="fill-structure" style="background:#a78bfa"></div></div>
+          </div>
+          <div class="score-dim">
+            <div class="score-dim-row">
+              <span class="score-dim-label">Content Depth</span>
+              <span class="score-dim-val" id="dim-content_depth">—</span>
+            </div>
+            <div class="score-track"><div class="score-fill" id="fill-content_depth" style="background:var(--green)"></div></div>
+          </div>
+          <div class="score-dim">
+            <div class="score-dim-row">
+              <span class="score-dim-label">Relevance</span>
+              <span class="score-dim-val" id="dim-relevance">—</span>
+            </div>
+            <div class="score-track"><div class="score-fill" id="fill-relevance" style="background:var(--yellow)"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Final verdict — hidden until summary -->
+      <div class="panel-section" id="summary-panel">
+        <div class="section-label">Final Verdict</div>
+        <div class="summary-text" id="summary-text">Generating…</div>
+      </div>
+
+      <!-- Question tracker — hidden until summary -->
+      <div class="panel-section" id="questions-panel" style="display:none">
+        <div class="section-label">Questions</div>
+        <div class="q-tracker" id="q-tracker"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const app = {
+  connected:    false,
+  agentState:   'IDLE',
+  totalQ:       10,
+  currentQ:     0,
+  questions:    [],
+  dimScores:    { communication: [], structure: [], content_depth: [], relevance: [] },
+  overallScores: [],
+  _qScores:     {},
+};
+
+// ── WebSocket ──────────────────────────────────────────────────────────────
+let ws, reconnectTimer;
+
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen  = () => { setConnected(true); clearInterval(reconnectTimer); heartbeat(); };
+  ws.onclose = () => { setConnected(false); reconnectTimer = setTimeout(connect, 2000); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = ({ data }) => {
+    let ev; try { ev = JSON.parse(data); } catch { return; }
+    handleEvent(ev);
+  };
+}
+
+function heartbeat() {
+  setInterval(() => ws.readyState === 1 && ws.send('ping'), 10000);
+}
+
+function setConnected(v) {
+  app.connected = v;
+  document.getElementById('conn-dot').className    = v ? 'connected' : '';
+  document.getElementById('conn-label').textContent = v ? 'Connected' : 'Disconnected';
+}
+
+// ── Setup → Interview ──────────────────────────────────────────────────────
+function startInterview() {
+  const name   = document.getElementById('candidate-name').value.trim() || 'Candidate';
+  const role   = document.getElementById('target-role').value.trim()    || 'Software Engineer';
+  const jd     = document.getElementById('jd-input').value.trim();
+  const qCount = parseInt(document.getElementById('q-count').value);
+
+  app.totalQ   = qCount;
+  app.currentQ = 0;
+
+  document.getElementById('tb-name').textContent = name;
+  document.getElementById('tb-role').textContent = role;
+  document.getElementById('progress-label').textContent = `Q 0 / ${qCount}`;
+
+  document.getElementById('setup-screen').style.display     = 'none';
+  document.getElementById('interview-screen').style.display = 'flex';
+
+  function sendStart() {
+    ws.send(JSON.stringify({ type: 'command', action: 'start_interview', role, jd, name, total_questions: qCount }));
+  }
+
+  if (ws && ws.readyState === 1) {
+    sendStart();
+  } else {
+    connect();
+    ws.addEventListener('open', sendStart, { once: true });
+  }
+}
+
+// ── Event dispatcher ───────────────────────────────────────────────────────
+function handleEvent(ev) {
+  switch (ev.type) {
+    case 'state':          handleState(ev.state);         break;
+    case 'transcript':     /* audio-only — no-op */        break;
+    case 'latency':        /* removed — no-op */           break;
+    case 'barge_in':       /* audio-only — no-op */        break;
+    case 'score_update':   handleScoreUpdate(ev);          break;
+    case 'session_state':  handleSessionState(ev);         break;
+    case 'question':       handleQuestion(ev);             break;
+    case 'summary':        handleSummary(ev);              break;
+    case 'questions_list': buildQuestionTracker(ev.questions); break;
+    case 'ping': break;
+  }
+}
+
+// ── Pipeline state ─────────────────────────────────────────────────────────
+const STATE_META = {
+  LOADING:        { label: 'Loading',    cls: '' },
+  IDLE:           { label: 'Idle',       cls: '' },
+  LISTENING:      { label: 'Listening',  cls: 'listening' },
+  AGENT_SPEAKING: { label: 'Speaking',   cls: 'agent-speaking' },
+  INTERRUPTED:    { label: 'Interrupted',cls: 'interrupted' },
+};
+
+function handleState(s) {
+  app.agentState = s;
+  const meta = STATE_META[s] || STATE_META.IDLE;
+  const orb  = document.getElementById('orb');
+  const pill = document.getElementById('state-label');
+  const txt  = document.getElementById('state-text');
+  const btn  = document.getElementById('mic-btn');
+  const lbl  = document.getElementById('mic-btn-label');
+
+  orb.className  = `avatar ${meta.cls}`;
+  pill.className = `status-pill ${meta.cls}`;
+  txt.textContent = meta.label;
+
+  if (s === 'LISTENING') {
+    btn.classList.add('active');
+    lbl.textContent = 'Listening';
+  } else if (s === 'AGENT_SPEAKING') {
+    btn.classList.remove('active');
+    lbl.textContent = 'Alex is speaking';
+  } else if (s === 'LOADING') {
+    btn.classList.remove('active');
+    lbl.textContent = 'Loading…';
+  } else {
+    btn.classList.remove('active');
+    lbl.textContent = 'Click to start';
+  }
+}
+
+// ── Question tracking ──────────────────────────────────────────────────────
+function buildQuestionTracker(questions) {
+  app.questions = questions;
+  const tracker = document.getElementById('q-tracker');
+  tracker.innerHTML = '';
+  questions.forEach((q, i) => {
+    const row = document.createElement('div');
+    row.className = 'q-row';
+    row.id = `q-row-${i}`;
+    row.innerHTML = `
+      <div class="q-num">${i + 1}</div>
+      <div class="q-text">${q}</div>
+      <div class="q-score" id="q-score-${i}">—</div>`;
+    tracker.appendChild(row);
+  });
+}
+
+function handleQuestion(ev) {
+  const { index } = ev;
+  app.currentQ = index + 1;
+
+  document.getElementById('progress-label').textContent = `Q ${app.currentQ} / ${app.totalQ}`;
+  document.getElementById('progress-bar').style.width = (app.currentQ / app.totalQ * 100) + '%';
+
+  document.querySelectorAll('.q-row').forEach((r, i) => {
+    r.classList.remove('active');
+    if (i < index) r.classList.add('done');
+    if (i === index) r.classList.add('active');
+  });
+}
+
+function handleSessionState(ev) {
+  if (ev.state === 'DONE') {
+    document.querySelectorAll('.q-row').forEach(r => r.classList.add('done'));
+    document.getElementById('progress-bar').style.width = '100%';
+  }
+}
+
+// ── Scores ─────────────────────────────────────────────────────────────────
+function handleScoreUpdate(ev) {
+  const { question_index, score } = ev;
+  ['communication', 'structure', 'content_depth', 'relevance'].forEach(d => {
+    if (score[d]) app.dimScores[d].push(score[d].score);
+  });
+  if (score.overall != null) app.overallScores.push(score.overall);
+  app._qScores[question_index] = score.overall;
+}
+
+function handleSummary(ev) {
+  ['overall-panel','scorecard-panel','questions-panel','summary-panel'].forEach(id => {
+    document.getElementById(id).style.display = '';
+  });
+
+  document.getElementById('summary-text').textContent = ev.text || 'Summary unavailable.';
+
+  if (ev.averages) {
+    ['communication','structure','content_depth','relevance'].forEach(d => {
+      const v = ev.averages[d];
+      if (v == null) return;
+      const dimEl  = document.getElementById(`dim-${d}`);
+      const fillEl = document.getElementById(`fill-${d}`);
+      if (dimEl)  { dimEl.textContent = v.toFixed(1); dimEl.classList.add('scored'); }
+      if (fillEl) fillEl.style.width = (v / 10 * 100) + '%';
+    });
+    const ov = ev.averages.overall;
+    if (ov != null) {
+      const numEl = document.getElementById('overall-num');
+      numEl.textContent = ov.toFixed(1);
+      numEl.classList.add('scored');
+      setVerdict(ov);
+    }
+  }
+
+  const serverScores = ev.scores || [];
+  if (serverScores.length > 0) {
+    serverScores.forEach((score, idx) => {
+      const el = document.getElementById(`q-score-${idx}`);
+      if (!el || score?.overall == null) return;
+      const v = score.overall;
+      el.textContent = `${v}/10`;
+      el.className = `q-score ${v >= 8 ? 'score-great' : v >= 6 ? 'score-good' : v >= 4 ? 'score-ok' : 'score-weak'}`;
+    });
+  } else {
+    Object.entries(app._qScores).forEach(([idx, v]) => {
+      const el = document.getElementById(`q-score-${idx}`);
+      if (el) el.textContent = `${v}/10`;
+    });
+  }
+
+  document.querySelectorAll('.q-row').forEach(r => r.classList.add('done'));
+}
+
+function setVerdict(score) {
+  const el = document.getElementById('overall-verdict');
+  el.className = 'verdict-badge show ' + (
+    score >= 8 ? 'verdict-strong' :
+    score >= 6 ? 'verdict-good'   :
+    score >= 4 ? 'verdict-needs'  : 'verdict-weak'
+  );
+  el.textContent = score >= 8 ? 'Strong Pass' : score >= 6 ? 'Pass' : score >= 4 ? 'Needs Work' : 'Not Ready';
+}
+
+// ── Mic toggle ─────────────────────────────────────────────────────────────
+function toggleMic() {
+  if (!app.connected) { connect(); return; }
+  if (app.agentState === 'LOADING' || app.agentState === 'AGENT_SPEAKING') return;
+  ws.send(JSON.stringify({ type: 'command', action: 'toggle_mic' }));
+}
+
+connect();
+</script>
+</body>
+</html>

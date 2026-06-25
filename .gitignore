@@ -1,0 +1,22 @@
+.env
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+logs/
+models/
+*.onnx
+*.onnx.json
+*.pt
+*.bin
+.DS_Store
+
+# test artifacts
+*.wav
+*.rawcls
+*.raw
+*.pcm
