@@ -1,75 +1,82 @@
 # PrepAI — AI Mock Interviewer
 
-A real-time voice-based behavioral interview coach. Ask a question out loud, get spoken feedback, and receive a detailed scorecard at the end. Built on a low-latency async voice pipeline with barge-in support.
+> A voice-first behavioral interview coach. Speak your answers out loud, get real-time spoken feedback from an AI interviewer, and receive a detailed scorecard at the end — all running locally with no cloud STT or TTS.
 
-> **Stack:** Python · asyncio · faster-whisper · Piper TTS · Silero VAD · WebSockets
+**Built from scratch in Python using raw `asyncio` — no voice agent frameworks.**
 
 ---
 
 ## Screenshots
 
-| Setup | Interview |
+| Setup | Live interview |
 |---|---|
 | ![Setup screen](image.png) | ![Interview in progress](interview.png) |
 
 ---
 
-## What it does
+## Why this is interesting to build
 
-PrepAI runs a full 10-question behavioral interview over voice, entirely locally (no cloud STT/TTS required):
+Most "voice AI" projects glue together a few APIs with no thought for timing. The hard part here is making the conversation feel natural:
 
-1. **Alex** (the AI interviewer) greets you and asks one behavioral question at a time
-2. You answer out loud — VAD detects when you stop speaking
-3. Alex gives brief spoken feedback and moves to the next question
-4. After all questions, a full **scorecard** appears in the browser UI — scored across Communication, Structure, Content Depth, and Relevance
-5. You can **barge in** (interrupt Alex mid-sentence) and he'll immediately stop and listen
-
-All scoring runs asynchronously in the background while the interview continues — no waiting.
+- **Barge-in** — if Alex is mid-sentence and you start talking, he stops *immediately*. This requires cancelling in-flight LLM streaming and TTS synthesis simultaneously, with precise event ordering to avoid race conditions.
+- **Overlapping pipeline stages** — LLM starts generating before STT is done; TTS starts synthesising the first sentence before the LLM finishes. Each stage runs concurrently via `asyncio` with a sentence queue as the handoff point.
+- **Echo suppression** — the microphone picks up Alex's own voice through the speaker. The VAD must stay blind during playback and through a cooldown period after it ends, or it triggers ghost turns on its own audio.
+- **Async scoring** — each answer is scored by an LLM call in a thread executor while the next question is already being asked. No waiting.
 
 ---
 
 ## Architecture
 
 ```
-Microphone (16 kHz mono PCM)
+Microphone (16 kHz PCM)
         │
-        ├──► Silero VAD (30 ms chunks)
-        │         │
-        │    SPEECH_START / SPEECH_END / BARGE_IN events
+        ├──► Silero VAD ──► SPEECH_START / SPEECH_END / BARGE_IN
         │         │
         │    BargeInController (state machine)
         │         │
-        └──► STT Buffer ──► faster-whisper ──► transcript
+        └──► STT buffer ──► faster-whisper ──► transcript
                                                     │
                                           ┌─────────▼──────────┐
-                                          │    LLM (stream)    │
+                                          │   LLM (streaming)  │
                                           └─────────┬──────────┘
                                                     │ tokens
-                                          sentence splitter
+                                            sentence splitter
                                                     │ sentences
                                           ┌─────────▼──────────┐
-                                          │    Piper TTS       │
+                                          │     Piper TTS      │
                                           └─────────┬──────────┘
                                                     │ PCM chunks
                                           ┌─────────▼──────────┐
                                           │   AudioPlayer      │
-                                          │ (dedicated thread) │
+                                          │  (drain thread)    │
                                           └────────────────────┘
 
-Background (non-blocking, per answer):
-  transcript + question ──► LLM eval ──► JSON scorecard ──► WebSocket ──► UI
+Background — per answer, non-blocking:
+  answer + question ──► LLM eval ──► JSON scores ──► WebSocket ──► browser
 ```
 
-### Key design decisions
+### Key engineering decisions
 
 | Decision | Why |
 |---|---|
-| Raw `asyncio`, no framework | Full control over barge-in cancellation timing — frameworks abstract this away in ways that fight custom cancel signals |
-| Sentence-level TTS streaming | First audio plays as soon as the first sentence is synthesised, not after the full LLM response |
-| Silero VAD during playback | Barge-in detection runs on the same mic stream — no second audio device needed |
-| Async scoring | Evaluator runs in a thread executor; next question starts immediately without waiting for scoring to finish |
-| Provider interfaces | Every component (VAD / STT / LLM / TTS) is behind an abstract class — swap providers by changing one env var |
-| Dedicated AudioPlayer thread | `sounddevice.write()` is blocking — running it off the event loop eliminates multi-second audio delays |
+| Raw `asyncio`, no framework | Barge-in requires cancelling LLM and TTS mid-flight with exact timing — every framework I looked at abstracts this in ways that make it impossible |
+| Sentence-level TTS streaming | First audio out of the speaker happens after the first sentence (~1 sentence), not after the full LLM response |
+| Dedicated `AudioPlayer` drain thread | `sounddevice.write()` blocks — calling it from the event loop via `run_in_executor` caused 6–7 s delays; a dedicated thread with a queue eliminates this entirely |
+| `agent_speaking` held through cooldown | Clearing it immediately after playback caused the VAD to pick up speaker ring-out as user speech, creating infinite echo loops |
+| VADIterator reset after each turn | Silero VAD is stateful — without a reset between turns, bleed audio from the speaker left the iterator in a mid-speech state that suppressed the next `SPEECH_START` |
+| Async evaluator in thread executor | LLM scoring calls are synchronous; running them in `run_in_executor` keeps the event loop free so the next question starts immediately |
+
+---
+
+## Features
+
+- **10-question behavioral interview** over voice with a real AI interviewer persona (Alex)
+- **Paste any job description** — questions are tailored to the role
+- **Barge-in** — interrupt Alex mid-sentence and he stops immediately
+- **Per-answer scoring** across 4 dimensions: Communication, Structure, Content Depth, Relevance
+- **Full scorecard** revealed at the end with per-question breakdown
+- **Fully local** — STT (faster-whisper) and TTS (Piper) run on-device; only the LLM call is remote
+- **Swappable providers** — every component is behind an interface; change STT/TTS/LLM with one env var
 
 ---
 
@@ -78,36 +85,32 @@ Background (non-blocking, per answer):
 ```
 prepai/
 ├── main.py                      # Entry point — wires providers, starts server
-├── .env.example                 # All config options documented
-├── requirements.txt
+├── .env.example                 # All config options with inline docs
 │
-├── interfaces/                  # Abstract contracts — implement to swap providers
-│   ├── llm.py
-│   ├── stt.py
-│   ├── tts.py
-│   └── vad.py
+├── interfaces/                  # Abstract contracts for every provider
+│   ├── llm.py, stt.py, tts.py, vad.py
 │
 ├── core/
-│   ├── pipeline.py              # VoicePipeline — main async orchestrator
+│   ├── pipeline.py              # VoicePipeline — async orchestrator (~420 lines)
 │   ├── barge_in.py              # BargeInController state machine
-│   ├── audio_utils.py           # MicrophoneStream, AudioPlayer
+│   ├── audio_utils.py           # MicrophoneStream, AudioPlayer (drain thread)
 │   ├── instrumentation.py       # Per-turn latency logging to JSONL
 │   ├── pronunciation.py         # Pre-TTS text normalisation
-│   └── stt_corrections.py       # Post-STT text corrections
+│   └── stt_corrections.py       # Post-STT corrections (name mishearings etc.)
 │
 ├── providers/
-│   ├── vad/silero.py            # Silero VAD v5 (local, ONNX)
+│   ├── vad/silero.py            # Silero VAD v5
 │   ├── stt/faster_whisper.py    # faster-whisper (local, default)
-│   ├── stt/deepgram.py          # Deepgram Nova-2 (cloud, lower latency)
-│   ├── llm/gemini.py            # LLM provider (streaming)
-│   ├── tts/piper.py             # Piper (local, default)
+│   ├── stt/deepgram.py          # Deepgram Nova-2 (cloud, swap-in)
+│   ├── llm/gemini.py            # Streaming LLM provider
+│   ├── tts/piper.py             # Piper TTS (local, default)
 │   └── tts/kokoro.py            # Kokoro ONNX (local, higher quality)
 │
 └── interviewer/
-    ├── interview_pipeline.py    # InterviewPipeline — extends VoicePipeline
+    ├── interview_pipeline.py    # Extends VoicePipeline with session logic
     ├── session.py               # InterviewSession state machine
-    ├── evaluator.py             # Per-answer async scorer (non-streaming)
-    ├── prompts.py               # All LLM prompts in one place
+    ├── evaluator.py             # Async per-answer scorer with JSON extraction
+    ├── prompts.py               # All LLM prompts centralised
     └── questions.py             # 40+ behavioral questions across 10 categories
 ```
 
@@ -119,10 +122,10 @@ prepai/
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # Linux / Mac
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # Linux / Mac
 
-# CPU-only PyTorch first (avoids downloading the 2 GB CUDA build)
+# CPU-only PyTorch (avoids the 2 GB CUDA build)
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 
 pip install -r requirements.txt
@@ -146,43 +149,42 @@ mkdir -p models/piper
 
 ```bash
 cp .env.example .env
-# Set your LLM API key (free at https://aistudio.google.com)
+# Set GEMINI_API_KEY — free tier at https://aistudio.google.com
 ```
 
 ### 4. Run
 
 ```bash
 python main.py
+# Open http://127.0.0.1:8765
 ```
-
-Open **http://127.0.0.1:8765** in your browser, fill in your name and target role, and click **Start Interview**.
 
 ---
 
 ## Swapping providers
 
-Every provider is behind a clean interface. Change one line in `.env`:
+Every provider implements an abstract interface in `interfaces/`. To swap:
 
 ```bash
-# Use Deepgram instead of faster-whisper (lower latency, requires API key)
+# Lower-latency cloud STT
 STT_PROVIDER=deepgram
 DEEPGRAM_API_KEY=your_key
 
-# Use Kokoro instead of Piper (higher quality voice)
+# Higher quality local TTS
 TTS_PROVIDER=kokoro
 KOKORO_MODEL_PATH=./models/kokoro
 ```
 
-To add a new provider: subclass the interface in `interfaces/`, implement the required methods, add a branch to the factory in `main.py`.
+To add a new provider: subclass the interface, implement the required methods, add a branch to the factory in `main.py`.
 
 ---
 
 ## Diagnostic scripts
 
 ```bash
-python test_devices.py      # Find the best mic device (prints RMS per device)
-python test_pipeline.py     # Test VAD → STT end-to-end from mic
-python test_scoring.py      # Run 3 fake Q&A pairs through the evaluator
+python test_devices.py    # Measure RMS across mic devices — find the best one
+python test_pipeline.py   # End-to-end VAD → STT test from mic
+python test_scoring.py    # Fire 3 Q&A pairs through the evaluator, print scores
 ```
 
 ---
@@ -191,9 +193,9 @@ python test_scoring.py      # Run 3 fake Q&A pairs through the evaluator
 
 | Symptom | Fix |
 |---|---|
-| No audio output | Check `TTS_PROVIDER` and model path in `.env`; run `python test_pipeline.py` |
-| Stuck in Listening after agent speaks | `VAD_SILENCE_MS` too high — set to `400` in `.env` |
+| No audio output | Check `TTS_PROVIDER` and model path in `.env` |
+| Agent speaks over itself / echo loops | `VAD_SILENCE_MS` too low — set to `400`; run `test_devices.py` to confirm mic device |
 | VAD fires on background noise | Raise `VAD_THRESHOLD` to `0.6`–`0.7` |
-| All scores are 5 | LLM API key missing or invalid — check `.env` |
-| High STT latency | Use `WHISPER_MODEL=tiny.en` or switch to `STT_PROVIDER=deepgram` |
-| Mic returns silence | Run `python test_devices.py` and set `MIC_DEVICE=<n>` in `.env` |
+| All scores show 5 | LLM API key missing or invalid — check `.env` |
+| High transcription latency | Switch to `WHISPER_MODEL=tiny.en` or `STT_PROVIDER=deepgram` |
+| Mic returns silence | Run `test_devices.py` and set `MIC_DEVICE=<n>` in `.env` |
